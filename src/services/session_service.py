@@ -1,10 +1,7 @@
-import io
-import base64
 from typing import Optional
 
-import qrcode
-
-from src.domain.models import Session, Estimate, VALID_ESTIMATES
+from src.config import settings
+from src.domain.models import Session, Estimate
 from src.repositories.base import SessionRepository
 from src.services.name_generator import generate_session_name
 
@@ -26,7 +23,7 @@ class SessionService:
     def __init__(self, repository: SessionRepository) -> None:
         self._repo = repository
 
-    SESSION_LIMIT = 100
+    SESSION_LIMIT = settings.SESSION_LIMIT
 
     def create_session(self, title: Optional[str] = None, creator: str = "") -> Session:
         if len(self._repo.list_all()) >= self.SESSION_LIMIT:
@@ -77,19 +74,9 @@ class SessionService:
         self._repo.save(session)
         return session
 
-    def generate_qr_code_base64(self, url: str) -> str:
-        img = qrcode.make(url)
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        return base64.b64encode(buffer.getvalue()).decode()
-
     def purge_expired_sessions(self) -> None:
-        self._repo.purge_expired(max_age_hours=24)
+        self._repo.purge_expired(max_age_hours=settings.SESSION_MAX_AGE_HOURS)
 
     def list_sessions(self) -> list:
         return self._repo.list_all()
-
-    @staticmethod
-    def get_valid_estimates() -> list:
-        return VALID_ESTIMATES
 

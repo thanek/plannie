@@ -40,11 +40,13 @@ VALID_ESTIMATES = list(Estimate)
 class Participant:
     username: str
     estimate: Optional[Estimate] = None
-    has_voted: bool = False
+
+    @property
+    def has_voted(self) -> bool:
+        return self.estimate is not None
 
     def vote(self, estimate: Estimate) -> None:
         self.estimate = estimate
-        self.has_voted = True
 
 
 @dataclass
@@ -60,6 +62,9 @@ class Session:
     def touch(self) -> None:
         self.last_used_at = _utcnow()
 
+    def is_managed_by(self, username: str) -> bool:
+        return not self.creator or username == self.creator
+
     def add_or_update_participant(self, username: str) -> Participant:
         if username not in self.participants:
             self.participants[username] = Participant(username=username)
@@ -74,7 +79,6 @@ class Session:
         self.is_closed = False
         for p in self.participants.values():
             p.estimate = None
-            p.has_voted = False
         self.touch()
 
     def close(self) -> None:

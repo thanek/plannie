@@ -1,5 +1,4 @@
 import asyncio
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +7,7 @@ from dotenv import load_dotenv
 
 from src.api.dependencies import get_session_service
 from src.api.routes import router
+from src.config import settings
 
 
 load_dotenv()
@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 async def _periodic_purge():
     service = get_session_service()
     while True:
-        await asyncio.sleep(3600)  # co godzinę
+        await asyncio.sleep(settings.PURGE_INTERVAL_SECONDS)
         service.purge_expired_sessions()
 
 
@@ -40,9 +40,9 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "src.main:app",
-        host=os.getenv("HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "8000")),
-        reload=os.getenv("RELOAD", "").lower() in ("1", "true"),
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
         timeout_graceful_shutdown=3,
     )
 

@@ -213,12 +213,11 @@ async def test_session_view_marks_user_as_voted_when_estimate_exists(authed_clie
     session = service.get_session(session_id)
     p = session.add_or_update_participant("TestPM")
     p.estimate = Estimate.FIVE
-    p.has_voted = False
     service._repo.save(session)
 
     r2 = await authed_client.get(f"/sessions/{session_id}")
     assert r2.status_code == 200
-    assert "oddał głos" in r2.text
+    assert 'class="participant voted"' in r2.text
 
 
 @pytest.mark.asyncio
