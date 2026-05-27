@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from src.api.dependencies import get_session_service
 from src.domain.models import VALID_ESTIMATES
-from src.services.session_service import SessionService, SessionNotFoundError, SessionClosedError
+from src.services.session_service import SessionService, SessionNotFoundError, SessionClosedError, SessionLimitExceededError
 
 templates = Jinja2Templates(directory="web/templates")
 
@@ -150,6 +150,8 @@ async def home(request: Request, service: SessionService = Depends(get_session_s
     return templates.TemplateResponse(request, "home.html", {
         "sessions": sessions,
         "username": username,
+        "limit_exceeded": request.query_params.get("error") == "limit",
+        "session_limit": service.SESSION_LIMIT,
     })
 
 
@@ -162,7 +164,10 @@ async def create_session(
     username, redirect = _require_username(request, "/")
     if redirect:
         return redirect
-    session = service.create_session(title.strip() or None, creator=username)
+    try:
+        session = service.create_session(title.strip() or None, creator=username)
+    except SessionLimitExceededError:
+        return RedirectResponse(url="/?error=limit", status_code=303)
     return RedirectResponse(url=f"/sessions/{session.id}", status_code=303)
 
 

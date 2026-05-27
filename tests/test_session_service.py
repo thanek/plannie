@@ -1,6 +1,6 @@
 import pytest
 from src.repositories.in_memory import InMemorySessionRepository
-from src.services.session_service import SessionService, SessionNotFoundError, SessionClosedError
+from src.services.session_service import SessionService, SessionNotFoundError, SessionClosedError, SessionLimitExceededError
 from src.domain.models import Estimate
 
 
@@ -27,6 +27,12 @@ class TestCreateSession:
     def test_unique_ids(self, service):
         ids = {service.create_session().id for _ in range(10)}
         assert len(ids) == 10
+
+    def test_raises_when_limit_reached(self, service):
+        for _ in range(service.SESSION_LIMIT):
+            service.create_session()
+        with pytest.raises(SessionLimitExceededError):
+            service.create_session()
 
 
 class TestVoting:

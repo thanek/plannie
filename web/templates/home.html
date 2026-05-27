@@ -5,10 +5,14 @@
   <div class="hero-icon">🃏</div>
   <h1>Planning Estimator</h1>
   <p class="subtitle">Utwórz sesję, udostępnij QR kod zespołowi i zacznij estymować.</p>
+  {% if limit_exceeded %}
+  <p class="info-banner">⚠️ Osiągnięto limit {{ session_limit }} sesji. Poczekaj aż starsze wygasną (po 24h).</p>
+  {% endif %}
   <form method="post" action="/sessions">
     <label for="title">Tytuł sesji <span class="hint">(opcjonalnie)</span></label>
-    <input id="title" name="title" type="text" placeholder="np. Sprint 42" autocomplete="off"/>
-    <button type="submit" class="btn-primary">Rozpocznij sesję →</button>
+    <input id="title" name="title" type="text" placeholder="np. Sprint 42" autocomplete="off"
+           {% if limit_exceeded %}disabled{% endif %}/>
+    <button type="submit" class="btn-primary" {% if limit_exceeded %}disabled{% endif %}>Rozpocznij sesję →</button>
   </form>
 </div>
 

@@ -109,6 +109,16 @@ async def test_create_session_without_cookie_redirects_to_login(client):
     assert "/login" in r.headers["location"]
 
 
+@pytest.mark.asyncio
+async def test_create_session_over_limit_redirects_with_error(authed_client):
+    service = get_session_service()
+    for _ in range(service.SESSION_LIMIT):
+        service.create_session()
+    r = await authed_client.post("/sessions", data={"title": "One too many"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/?error=limit"
+
+
 # ── Session view ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

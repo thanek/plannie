@@ -17,12 +17,20 @@ class SessionClosedError(Exception):
     pass
 
 
+class SessionLimitExceededError(Exception):
+    pass
+
+
 class SessionService:
 
     def __init__(self, repository: SessionRepository) -> None:
         self._repo = repository
 
+    SESSION_LIMIT = 100
+
     def create_session(self, title: Optional[str] = None, creator: str = "") -> Session:
+        if len(self._repo.list_all()) >= self.SESSION_LIMIT:
+            raise SessionLimitExceededError(f"Osiągnięto limit {self.SESSION_LIMIT} sesji")
         session = Session(title=title or generate_session_name(), creator=creator)
         self._repo.save(session)
         return session
