@@ -68,7 +68,7 @@ cmd_start() {
     info "Uruchamiam Planning Estimator"
     echo -e "${BOLD}  Zatrzymaj serwis: Ctrl+C${RESET}"
     echo ""
-    python -m src.main
+    exec "$VENV_DIR/bin/python" -m src.main
 }
 
 cmd_test() {
