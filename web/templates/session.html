@@ -184,7 +184,12 @@
       radio.closest(".estimate-card").classList.add("selected");
       if (!voteForm || submitting) return;
       submitting = true;
-      voteForm.requestSubmit();
+      fetch(voteForm.action, {
+        method: "POST",
+        body: new FormData(voteForm),
+        redirect: "follow",
+        credentials: "same-origin",
+      }).finally(() => { submitting = false; });
     });
   });
 </script>
