@@ -1,52 +1,64 @@
 {% extends "base.html" %}
 {% block title %}Planning Estimator{% endblock %}
-{% block content %}
-<div class="card center">
-  <div class="hero-icon">🃏</div>
-  <h1>Planning Estimator</h1>
-  <p class="subtitle">Utwórz sesję, udostępnij QR kod zespołowi i zacznij estymować.</p>
-  {% if limit_exceeded %}
-  <p class="info-banner">⚠️ Osiągnięto limit {{ session_limit }} sesji. Poczekaj aż starsze wygasną (po 24h).</p>
-  {% endif %}
-  <form method="post" action="/sessions">
-    <label for="title">Tytuł sesji <span class="hint">(opcjonalnie)</span></label>
-    <input id="title" name="title" type="text" placeholder="np. Sprint 42" autocomplete="off"
-           {% if limit_exceeded %}disabled{% endif %}/>
-    <button type="submit" class="btn-primary" {% if limit_exceeded %}disabled{% endif %}>Rozpocznij sesję →</button>
+
+{% block header_user %}
+<div class="header-user">
+  <span class="header-user-label">Cześć, </span><strong class="header-username">{{ username }}</strong>
+  <form method="post" action="/logout" class="inline-form">
+    <button type="submit" class="link-btn">wyloguj</button>
   </form>
 </div>
+{% endblock %}
 
-{% if sessions %}
-<div class="sessions-table-wrap center">
-  <h2 class="sessions-heading">Sesje</h2>
-  <div class="table-card">
-    <table class="sessions-table">
-      <thead>
-        <tr>
-          <th>Tytuł</th>
-          <th class="col-participants">Uczestnicy</th>
-          <th class="col-date">Utworzona</th>
-          <th class="col-status">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in sessions %}
-        <tr class="session-row" onclick="window.location='/sessions/{{ s.id }}'">
-          <td class="col-title"><a href="/sessions/{{ s.id }}" class="session-row-link">{{ s.title }}</a></td>
-          <td class="col-participants">{{ s.participants | length }}</td>
-          <td class="col-date">{{ s.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-          <td class="col-status">
-            {% if s.is_closed %}
-            <span class="session-badge badge-closed">zamknięta</span>
-            {% else %}
-            <span class="session-badge badge-open">aktywna</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% block content %}
+<div class="home-layout">
+  <div class="card home-create-card">
+    <div class="hero-icon">🃏</div>
+    <h1>Planning Estimator</h1>
+    <p class="subtitle">Utwórz sesję, udostępnij QR kod zespołowi i zacznij estymować.</p>
+    {% if limit_exceeded %}
+    <p class="info-banner">⚠️ Osiągnięto limit {{ session_limit }} sesji. Poczekaj aż starsze wygasną (po 24h).</p>
+    {% endif %}
+    <form method="post" action="/sessions">
+      <label for="title">Tytuł sesji <span class="hint">(opcjonalnie)</span></label>
+      <input id="title" name="title" type="text" placeholder="np. Sprint 42" autocomplete="off"
+             {% if limit_exceeded %}disabled{% endif %}/>
+      <button type="submit" class="btn-primary" {% if limit_exceeded %}disabled{% endif %}>Rozpocznij sesję →</button>
+    </form>
   </div>
+
+  {% if sessions %}
+  <div class="sessions-table-wrap">
+    <h2 class="sessions-heading">Sesje</h2>
+    <div class="table-card">
+      <table class="sessions-table">
+        <thead>
+          <tr>
+            <th>Tytuł</th>
+            <th class="col-participants">Uczestnicy</th>
+            <th class="col-date">Utworzona</th>
+            <th class="col-status">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sessions %}
+          <tr class="session-row" onclick="window.location='/sessions/{{ s.id }}'">
+            <td class="col-title"><a href="/sessions/{{ s.id }}" class="session-row-link">{{ s.title }}</a></td>
+            <td class="col-participants">{{ s.participants | length }}</td>
+            <td class="col-date">{{ s.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="col-status">
+              {% if s.is_closed %}
+              <span class="session-badge badge-closed">zamknięta</span>
+              {% else %}
+              <span class="session-badge badge-open">aktywna</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 {% endblock %}

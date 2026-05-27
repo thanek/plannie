@@ -1,76 +1,53 @@
 {% extends "base.html" %}
 {% block title %}{{ session.title }} – Planning Estimator{% endblock %}
+
+{% block header_user %}
+<div class="header-user">
+  <span class="header-user-label">Głosujesz jako </span><strong class="header-username">{{ username }}</strong>
+  <form method="post" action="/sessions/{{ session.id }}/logout" class="inline-form">
+    <button type="submit" class="link-btn">wyloguj</button>
+  </form>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="pm-layout">
+<div class="session-layout">
 
-  <!-- Lewa kolumna -->
+  <!-- 1. QR + info + PM actions -->
   <section class="card">
-    <h2 id="session-title">{{ session.title }}</h2>
-    <p class="session-id">ID: <code>{{ session.id }}</code></p>
-
-    <div class="qr-block">
-      <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR kod" class="qr-img"/>
-      <p class="session-url">
-        <a href="{{ session_url }}" target="_blank">{{ session_url }}</a>
-      </p>
-    </div>
-
-    {% if is_pm %}
-    <div class="pm-actions">
-      {% if not session.is_closed %}
-      <form method="post" action="/sessions/{{ session.id }}/close">
-        <button class="btn-danger">🔒 Zamknij i pokaż wyniki</button>
-      </form>
-      {% else %}
-      <p class="info-banner">🔒 Sesja zamknięta – wyniki widoczne obok.</p>
-      {% endif %}
-      <details class="reset-form">
-        <summary>🔄 Nowe głosowanie</summary>
-        <form method="post" action="/sessions/{{ session.id }}/reset">
-          <input name="title" type="text" placeholder="Nowy tytuł (opcjonalnie)"/>
-          <button type="submit" class="btn-secondary">Resetuj sesję</button>
-        </form>
-      </details>
-    </div>
-    {% endif %}
-
-    <hr class="section-divider"/>
-
-    <!-- Sekcja głosowania -->
-    <div>
-      <p class="vote-identity">
-        Głosujesz jako <strong>{{ username }}</strong>
-        <form method="post" action="/sessions/{{ session.id }}/logout" class="inline-form">
-          <button type="submit" class="link-btn">wyloguj</button>
-        </form>
-      </p>
-
-      {% if not session.is_closed %}
-      <form method="post" action="/sessions/{{ session.id }}/vote" id="vote-form">
-        <input type="hidden" name="username" value="{{ username }}"/>
-        <div class="estimate-grid">
-          {% for e in estimates %}
-          <label class="estimate-card {% if my_estimate == e.value %}selected{% endif %}">
-            <input type="radio" name="estimate" value="{{ e.value }}"
-                   {% if my_estimate == e.value %}checked{% endif %} required/>
-            <span>{{ e.value }}</span>
-          </label>
-          {% endfor %}
+    <div class="qr-card-inner">
+      <div class="qr-block">
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR kod" class="qr-img"/>
+      </div>
+      <div class="qr-card-info">
+        <h2 id="session-title">{{ session.title }}</h2>
+        <p class="session-id">ID: <code>{{ session.id }}</code></p>
+        <p class="session-url">
+          <a href="{{ session_url }}" target="_blank">{{ session_url }}</a>
+        </p>
+        {% if is_pm %}
+        <div class="pm-actions">
+          {% if not session.is_closed %}
+          <form method="post" action="/sessions/{{ session.id }}/close">
+            <button class="btn-danger">🔒 Zamknij i pokaż wyniki</button>
+          </form>
+          {% else %}
+          <p class="info-banner">🔒 Sesja zamknięta – wyniki widoczne poniżej.</p>
+          {% endif %}
+          <details class="reset-form">
+            <summary>🔄 Nowe głosowanie</summary>
+            <form method="post" action="/sessions/{{ session.id }}/reset">
+              <input name="title" type="text" placeholder="Nowy tytuł (opcjonalnie)"/>
+              <button type="submit" class="btn-secondary">Resetuj sesję</button>
+            </form>
+          </details>
         </div>
-      </form>
-      {% if my_estimate %}
-      <p class="voted-confirm">✅ Twój aktualny głos: <strong>{{ my_estimate }}</strong>. Możesz go zmienić.</p>
-      {% endif %}
-      {% else %}
-      <p class="info-banner">🔒 Głosowanie zakończone.</p>
-      {% if my_estimate %}
-      <p class="voted-confirm">Twój głos: <strong>{{ my_estimate }}</strong></p>
-      {% endif %}
-      {% endif %}
+        {% endif %}
+      </div>
     </div>
   </section>
 
-  <!-- Prawa kolumna: uczestnicy -->
+  <!-- 2. Uczestnicy + postęp + podsumowanie -->
   <section class="card">
     <div class="votes-progress-wrap">
       <p class="votes-progress-label">
@@ -126,6 +103,32 @@
         {% endfor %}
       </ul>
     </div>
+    {% endif %}
+  </section>
+
+  <!-- 3. Głosowanie -->
+  <section class="card">
+    {% if not session.is_closed %}
+    <form method="post" action="/sessions/{{ session.id }}/vote" id="vote-form">
+      <input type="hidden" name="username" value="{{ username }}"/>
+      <div class="estimate-grid">
+        {% for e in estimates %}
+        <label class="estimate-card {% if my_estimate == e.value %}selected{% endif %}">
+          <input type="radio" name="estimate" value="{{ e.value }}"
+                 {% if my_estimate == e.value %}checked{% endif %} required/>
+          <span>{{ e.value }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </form>
+    {% if my_estimate %}
+    <p class="voted-confirm">✅ Twój aktualny głos: <strong>{{ my_estimate }}</strong>. Możesz go zmienić.</p>
+    {% endif %}
+    {% else %}
+    <p class="info-banner">🔒 Głosowanie zakończone.</p>
+    {% if my_estimate %}
+    <p class="voted-confirm">Twój głos: <strong>{{ my_estimate }}</strong></p>
+    {% endif %}
     {% endif %}
   </section>
 

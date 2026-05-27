@@ -271,6 +271,13 @@ async def submit_vote(
     return response
 
 
+@router.post("/logout")
+async def logout_global(request: Request):
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("username")
+    return response
+
+
 @router.post("/sessions/{session_id}/logout")
 async def logout(
     request: Request,

@@ -15,7 +15,10 @@
 <body>
   <header>
     <a href="/" class="logo">🃏 Planning Estimator</a>
-    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Przełącz motyw"></button>
+    <div class="header-right">
+      {% block header_user %}{% endblock %}
+      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Przełącz motyw"></button>
+    </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
   <script>
