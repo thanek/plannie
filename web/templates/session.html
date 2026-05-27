@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }} – Planning Estimator{% endblock %}
+{% block content %}
+<div class="pm-layout">
+
+  <!-- Lewa kolumna -->
+  <section class="card">
+    <h2 id="session-title">{{ session.title }}</h2>
+    <p class="session-id">ID: <code>{{ session.id }}</code></p>
+
+    <div class="qr-block">
+      <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR kod" class="qr-img"/>
+      <p class="session-url">
+        <a href="{{ session_url }}" target="_blank">{{ session_url }}</a>
+      </p>
+    </div>
+
+    {% if is_pm %}
+    <div class="pm-actions">
+      {% if not session.is_closed %}
+      <form method="post" action="/sessions/{{ session.id }}/close">
+        <button class="btn-danger">🔒 Zamknij i pokaż wyniki</button>
+      </form>
+      {% else %}
+      <p class="info-banner">🔒 Sesja zamknięta – wyniki widoczne obok.</p>
+      {% endif %}
+      <details class="reset-form">
+        <summary>🔄 Nowe głosowanie</summary>
+        <form method="post" action="/sessions/{{ session.id }}/reset">
+          <input name="title" type="text" placeholder="Nowy tytuł (opcjonalnie)"/>
+          <button type="submit" class="btn-secondary">Resetuj sesję</button>
+        </form>
+      </details>
+    </div>
+    {% endif %}
+
+    <hr class="section-divider"/>
+
+    <!-- Sekcja głosowania -->
+    <div>
+      <p class="vote-identity">
+        Głosujesz jako <strong>{{ username }}</strong>
+        <form method="post" action="/sessions/{{ session.id }}/logout" class="inline-form">
+          <button type="submit" class="link-btn">wyloguj</button>
+        </form>
+      </p>
+
+      {% if not session.is_closed %}
+      <form method="post" action="/sessions/{{ session.id }}/vote" id="vote-form">
+        <input type="hidden" name="username" value="{{ username }}"/>
+        <div class="estimate-grid">
+          {% for e in estimates %}
+          <label class="estimate-card {% if my_estimate == e.value %}selected{% endif %}">
+            <input type="radio" name="estimate" value="{{ e.value }}"
+                   {% if my_estimate == e.value %}checked{% endif %} required/>
+            <span>{{ e.value }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </form>
+      {% if my_estimate %}
+      <p class="voted-confirm">✅ Twój aktualny głos: <strong>{{ my_estimate }}</strong>. Możesz go zmienić.</p>
+      {% endif %}
+      {% else %}
+      <p class="info-banner">🔒 Głosowanie zakończone.</p>
+      {% if my_estimate %}
+      <p class="voted-confirm">Twój głos: <strong>{{ my_estimate }}</strong></p>
+      {% endif %}
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Prawa kolumna: uczestnicy -->
+  <section class="card">
+    <div class="votes-progress-wrap">
+      <p class="votes-progress-label">
+        Oddane głosy: <strong><span id="votes-count">{{ state.votes_count }}</span>/<span id="total-count">{{ state.total_count }}</span></strong>
+      </p>
+      {% set progress = (state.votes_count * 100 / state.total_count) if state.total_count > 0 else 0 %}
+      <div class="votes-progress" role="progressbar" aria-label="Postęp głosowania"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ progress|round|int }}">
+        <div id="votes-progress-fill" class="votes-progress-fill" style="width: {{ progress }}%"></div>
+      </div>
+    </div>
+
+    <h3>
+      Uczestnicy
+      <span class="counter">
+        (<span id="votes-count-inline">{{ state.votes_count }}</span> / <span id="total-count-inline">{{ state.total_count }}</span> zagłosowało)
+      </span>
+    </h3>
+
+    <ul id="participants-list">
+      {% for p in state.participants %}
+      <li class="participant {% if p.has_voted %}voted{% endif %}" data-user="{{ p.username }}">
+        <span class="username">
+          {{ p.username }}
+          {% if p.username == session.creator %}<span class="pm-tag">PM</span>{% endif %}
+        </span>
+        <span class="vote-badge">
+          {% if session.is_closed and p.estimate %}
+            <strong class="reveal">{{ p.estimate }}</strong>
+          {% elif p.has_voted %}
+            ✅ oddał głos
+          {% else %}
+            <span class="waiting">⏳ oczekuje</span>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if state.total_count == 0 %}
+    <p class="empty-hint">Udostępnij link lub QR kod uczestnikom.</p>
+    {% endif %}
+
+    {% if session.is_closed %}
+    <div id="vote-summary" class="vote-summary">
+      <h4>Podsumowanie głosowania</h4>
+      <ul id="vote-summary-list" class="vote-summary-list">
+        {% for item in state.vote_summary %}
+        <li class="vote-summary-item">
+          <span class="summary-estimate">{{ item.estimate }}</span>
+          <span class="summary-count">{{ item.count }} os.</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+
+</div>
+
+<script>
+  const sessionId = "{{ session.id }}";
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws/sessions/${sessionId}`);
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.event === "ping") return;
+    if (data.event === "session_reset" || data.event === "session_closed") {
+      setTimeout(() => location.reload(), 300);
+      return;
+    }
+    updateParticipants(data);
+  };
+
+  ws.onclose = () => setTimeout(() => location.reload(), 3000);
+
+  function updateParticipants(data) {
+    const progress = data.total_count > 0 ? Math.round((data.votes_count * 100) / data.total_count) : 0;
+    document.getElementById("session-title").textContent = data.title;
+    document.getElementById("votes-count").textContent = data.votes_count;
+    document.getElementById("total-count").textContent = data.total_count;
+    document.getElementById("votes-count-inline").textContent = data.votes_count;
+    document.getElementById("total-count-inline").textContent = data.total_count;
+    document.getElementById("votes-progress-fill").style.width = `${progress}%`;
+
+    const list = document.getElementById("participants-list");
+    list.innerHTML = data.participants.map(p => {
+      let badge;
+      if (data.is_closed && p.estimate) {
+        badge = `<strong class="reveal">${p.estimate}</strong>`;
+      } else if (p.has_voted) {
+        badge = "✅ oddał głos";
+      } else {
+        badge = `<span class="waiting">⏳ oczekuje</span>`;
+      }
+      return `
+        <li class="participant ${p.has_voted ? 'voted' : ''}" data-user="${p.username}">
+          <span class="username">${p.username}</span>
+          <span class="vote-badge">${badge}</span>
+        </li>`;
+    }).join('');
+  }
+
+  const voteForm = document.getElementById("vote-form");
+  let submitting = false;
+
+  document.querySelectorAll(".estimate-card input[type=radio]").forEach(radio => {
+    radio.addEventListener("change", () => {
+      document.querySelectorAll(".estimate-card").forEach(c => c.classList.remove("selected"));
+      radio.closest(".estimate-card").classList.add("selected");
+      if (!voteForm || submitting) return;
+      submitting = true;
+      voteForm.requestSubmit();
+    });
+  });
+</script>
+{% endblock %}

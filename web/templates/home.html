@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Planning Estimator{% endblock %}
+{% block content %}
+<div class="card center">
+  <div class="hero-icon">🃏</div>
+  <h1>Planning Estimator</h1>
+  <p class="subtitle">Utwórz sesję, udostępnij QR kod zespołowi i zacznij estymować.</p>
+  <form method="post" action="/sessions">
+    <label for="title">Tytuł sesji <span class="hint">(opcjonalnie)</span></label>
+    <input id="title" name="title" type="text" placeholder="np. Sprint 42" autocomplete="off"/>
+    <button type="submit" class="btn-primary">Rozpocznij sesję →</button>
+  </form>
+</div>
+
+{% if sessions %}
+<div class="sessions-table-wrap center">
+  <h2 class="sessions-heading">Sesje</h2>
+  <div class="table-card">
+    <table class="sessions-table">
+      <thead>
+        <tr>
+          <th>Tytuł</th>
+          <th class="col-participants">Uczestnicy</th>
+          <th class="col-date">Utworzona</th>
+          <th class="col-status">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr class="session-row" onclick="window.location='/sessions/{{ s.id }}'">
+          <td class="col-title"><a href="/sessions/{{ s.id }}" class="session-row-link">{{ s.title }}</a></td>
+          <td class="col-participants">{{ s.participants | length }}</td>
+          <td class="col-date">{{ s.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td class="col-status">
+            {% if s.is_closed %}
+            <span class="session-badge badge-closed">zamknięta</span>
+            {% else %}
+            <span class="session-badge badge-open">aktywna</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

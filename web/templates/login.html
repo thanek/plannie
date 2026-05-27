@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Zaloguj się – Planning Estimator{% endblock %}
+{% block content %}
+<div class="card center">
+  <div class="hero-icon">👤</div>
+  <h1>Przedstaw się</h1>
+  <p class="subtitle">Podaj swoje imię, żeby dołączyć do estymowania.</p>
+  <form method="post" action="/login">
+    <input type="hidden" name="next_url" value="{{ next }}"/>
+    <label for="username">Twoje imię</label>
+    <input id="username" name="username" type="text" required
+           placeholder="np. Jan Kowalski" autocomplete="nickname" maxlength="40"
+           autofocus/>
+    <button type="submit" class="btn-primary">Dalej →</button>
+  </form>
+</div>
+{% endblock %}
