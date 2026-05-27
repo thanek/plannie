@@ -78,9 +78,9 @@
           {% if session.is_closed and p.estimate %}
             <strong class="reveal">{{ p.estimate }}</strong>
           {% elif p.has_voted %}
-            ✅ oddał głos
+            ✅
           {% else %}
-            <span class="waiting">⏳ oczekuje</span>
+            <span class="waiting">⏳</span>
           {% endif %}
         </span>
       </li>
@@ -166,9 +166,9 @@
       if (data.is_closed && p.estimate) {
         badge = `<strong class="reveal">${p.estimate}</strong>`;
       } else if (p.has_voted) {
-        badge = "✅ oddał głos";
+        badge = "✅";
       } else {
-        badge = `<span class="waiting">⏳ oczekuje</span>`;
+        badge = `<span class="waiting">⏳</span>`;
       }
       return `
         <li class="participant ${p.has_voted ? 'voted' : ''}" data-user="${p.username}">
