@@ -35,6 +35,7 @@
         <thead>
           <tr>
             <th>Tytuł</th>
+            <th class="col-creator">Autor</th>
             <th class="col-participants">Uczestnicy</th>
             <th class="col-date">Utworzona</th>
             <th class="col-status">Status</th>
@@ -44,6 +45,7 @@
           {% for s in sessions %}
           <tr class="session-row" onclick="window.location='/sessions/{{ s.id }}'">
             <td class="col-title"><a href="/sessions/{{ s.id }}" class="session-row-link">{{ s.title }}</a></td>
+            <td class="col-creator">{{ s.creator or '—' }}</td>
             <td class="col-participants">{{ s.participants | length }}</td>
             <td class="col-date">{{ s.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
             <td class="col-status">
