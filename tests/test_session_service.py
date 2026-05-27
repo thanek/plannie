@@ -78,6 +78,30 @@ class TestVoting:
         assert all(p.has_voted for p in s.participants.values())
 
 
+class TestNameHandover:
+    def test_claim_freed_name_resets_vote(self, service):
+        s = service.create_session("T")
+        service.submit_vote(s.id, "Alice", "5", client_id="cid-A")
+        assert service.get_session(s.id).participants["Alice"].estimate == Estimate.FIVE
+
+        service.join_session(s.id, "Alice", client_id="cid-B")
+        p = service.get_session(s.id).participants["Alice"]
+        assert p.estimate is None
+        assert p.client_id == "cid-B"
+
+    def test_same_client_keeps_vote(self, service):
+        s = service.create_session("T")
+        service.submit_vote(s.id, "Alice", "5", client_id="cid-A")
+        service.join_session(s.id, "Alice", client_id="cid-A")
+        assert service.get_session(s.id).participants["Alice"].estimate == Estimate.FIVE
+
+    def test_first_owner_assignment_keeps_vote(self, service):
+        s = service.create_session("T")
+        service.submit_vote(s.id, "Alice", "5")  # client_id None
+        service.join_session(s.id, "Alice", client_id="cid-A")
+        assert service.get_session(s.id).participants["Alice"].estimate == Estimate.FIVE
+
+
 class TestSessionLifecycle:
     def test_close_session(self, service):
         s = service.create_session("Test")

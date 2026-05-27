@@ -1,10 +1,13 @@
+import uuid
 from typing import Optional, Tuple
 from urllib.parse import quote, unquote
 
 from fastapi import Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from src.config import settings
+
+CLIENT_ID_COOKIE = "client_id"
 
 
 def encode_username_cookie(username: str) -> str:
@@ -26,6 +29,18 @@ def set_username_cookie(response: RedirectResponse, username: str) -> None:
 
 def get_username(request: Request) -> str:
     return decode_username_cookie(request.cookies.get("username") or "").strip()
+
+
+def get_client_id(request: Request) -> str:
+    return (request.cookies.get(CLIENT_ID_COOKIE) or "").strip()
+
+
+def get_or_create_client_id(request: Request) -> str:
+    return get_client_id(request) or uuid.uuid4().hex
+
+
+def set_client_id_cookie(response: Response, client_id: str) -> None:
+    response.set_cookie(CLIENT_ID_COOKIE, client_id, max_age=settings.USERNAME_COOKIE_MAX_AGE)
 
 
 def safe_next(next_url: str) -> str:

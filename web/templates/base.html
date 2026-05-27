@@ -34,6 +34,15 @@
       if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
     }
     updateIcon();
+
+    // Utrzymuje obecność (imię „żywe"), by inni nie mogli go przejąć.
+    (function () {
+      function beat() {
+        fetch('/heartbeat', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+      }
+      beat();
+      setInterval(beat, 10000);
+    })();
   </script>
 </body>
 </html>

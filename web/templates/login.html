@@ -5,6 +5,9 @@
   <div class="hero-icon">👤</div>
   <h1>Przedstaw się</h1>
   <p class="subtitle">Podaj swoje imię, żeby dołączyć do estymowania.</p>
+  {% if error == "name_taken" %}
+  <p class="info-banner">⚠️ To imię jest teraz zajęte przez inną osobę. Wybierz inne.</p>
+  {% endif %}
   <form method="post" action="/login">
     <input type="hidden" name="next_url" value="{{ next }}"/>
     <label for="username">Twoje imię</label>

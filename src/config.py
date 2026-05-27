@@ -13,6 +13,7 @@ class Settings:
     SESSION_MAX_AGE_HOURS = 24
     PURGE_INTERVAL_SECONDS = 3600
     USERNAME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+    PRESENCE_GRACE_SECONDS = 30
 
     @property
     def host(self) -> str:

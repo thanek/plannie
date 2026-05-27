@@ -40,6 +40,7 @@ VALID_ESTIMATES = list(Estimate)
 class Participant:
     username: str
     estimate: Optional[Estimate] = None
+    client_id: Optional[str] = None
 
     @property
     def has_voted(self) -> bool:
@@ -65,10 +66,17 @@ class Session:
     def is_managed_by(self, username: str) -> bool:
         return not self.creator or username == self.creator
 
-    def add_or_update_participant(self, username: str) -> Participant:
-        if username not in self.participants:
-            self.participants[username] = Participant(username=username)
-        return self.participants[username]
+    def add_or_update_participant(self, username: str, client_id: Optional[str] = None) -> Participant:
+        participant = self.participants.get(username)
+        if participant is None:
+            participant = Participant(username=username, client_id=client_id)
+            self.participants[username] = participant
+        elif client_id is not None and participant.client_id != client_id:
+            if participant.client_id is not None:
+                # Inny klient przejął zwolnione imię — nie dziedziczy poprzedniego głosu.
+                participant.estimate = None
+            participant.client_id = client_id
+        return participant
 
     def remove_participant(self, username: str) -> None:
         self.participants.pop(username, None)

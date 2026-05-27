@@ -64,9 +64,9 @@ class SessionService:
         self._repo.save(session)
         return session
 
-    def join_session(self, session_id: str, username: str) -> Session:
+    def join_session(self, session_id: str, username: str, client_id: Optional[str] = None) -> Session:
         session = self.get_session(session_id)
-        session.add_or_update_participant(username)
+        session.add_or_update_participant(username, client_id)
         session.touch()
         self._repo.save(session)
         return session
@@ -77,12 +77,14 @@ class SessionService:
         self._repo.save(session)
         return session
 
-    def submit_vote(self, session_id: str, username: str, estimate_value: str) -> Session:
+    def submit_vote(
+        self, session_id: str, username: str, estimate_value: str, client_id: Optional[str] = None
+    ) -> Session:
         session = self.get_session(session_id)
         if session.is_closed:
             raise SessionClosedError("Cannot vote in a closed session")
         estimate = Estimate(estimate_value)
-        participant = session.add_or_update_participant(username)
+        participant = session.add_or_update_participant(username, client_id)
         participant.vote(estimate)
         session.touch()
         self._repo.save(session)

@@ -1,15 +1,17 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
-from src.api.dependencies import get_session_service
+from src.api.dependencies import get_session_service, get_presence_registry
 from src.domain.models import Estimate
 
 
 @pytest.fixture(autouse=True)
 def reset_service():
     get_session_service.cache_clear()
+    get_presence_registry.cache_clear()
     yield
     get_session_service.cache_clear()
+    get_presence_registry.cache_clear()
 
 
 @pytest.fixture
@@ -62,6 +64,58 @@ async def test_login_with_cookie_redirects_to_home(client):
     r = await client.get("/login", follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["location"] == "/"
+
+
+# ── Name uniqueness ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_login_blocked_when_name_live_for_other_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as a, \
+               AsyncClient(transport=transport, base_url="http://test") as b:
+        r1 = await a.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        assert r1.headers["location"] == "/"
+
+        r2 = await b.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        assert r2.status_code == 303
+        assert "error=name_taken" in r2.headers["location"]
+        assert "username" not in r2.cookies
+
+
+@pytest.mark.asyncio
+async def test_login_allowed_same_client_relogin(client):
+    r1 = await client.post("/login", data={"username": "Alice"}, follow_redirects=False)
+    assert r1.headers["location"] == "/"
+    r2 = await client.post("/login", data={"username": "Alice"}, follow_redirects=False)
+    assert r2.headers["location"] == "/"
+
+
+@pytest.mark.asyncio
+async def test_login_allowed_after_logout():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as a, \
+               AsyncClient(transport=transport, base_url="http://test") as b:
+        await a.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        await a.post("/logout", follow_redirects=False)
+        r = await b.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        assert r.headers["location"] == "/"
+
+
+@pytest.mark.asyncio
+async def test_name_freed_after_grace(monkeypatch):
+    monkeypatch.setattr("src.config.settings.PRESENCE_GRACE_SECONDS", 0)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as a, \
+               AsyncClient(transport=transport, base_url="http://test") as b:
+        await a.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        r = await b.post("/login", data={"username": "Alice"}, follow_redirects=False)
+        assert r.headers["location"] == "/"
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_keeps_name_taken(client):
+    r = await client.post("/heartbeat", follow_redirects=False)
+    assert r.status_code == 204
 
 
 # ── Home ──────────────────────────────────────────────────────────────────────

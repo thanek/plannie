@@ -2,13 +2,22 @@ import asyncio
 import json
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request, WebSocket
+from fastapi import APIRouter, Depends, Form, Request, Response, WebSocket
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from src.api.auth import get_username, require_username, safe_next, set_username_cookie
+from src.api.auth import (
+    get_client_id,
+    get_or_create_client_id,
+    get_username,
+    require_username,
+    safe_next,
+    set_client_id_cookie,
+    set_username_cookie,
+)
 from src.api.connections import ConnectionManager
-from src.api.dependencies import get_connection_manager, get_session_service
+from src.api.dependencies import get_connection_manager, get_presence_registry, get_session_service
+from src.api.presence import PresenceRegistry
 from src.api.presenters import session_state
 from src.config import settings
 from src.domain.models import VALID_ESTIMATES
@@ -46,20 +55,30 @@ async def login_view(request: Request):
         return RedirectResponse(safe_next(request.query_params.get("next", "/")), status_code=302)
     return templates.TemplateResponse(request, "login.html", {
         "next": request.query_params.get("next", "/"),
+        "error": request.query_params.get("error"),
     })
 
 
 @router.post("/login")
 async def login_submit(
+    request: Request,
     username: str = Form(""),
     next_url: str = Form("/"),
+    presence: PresenceRegistry = Depends(get_presence_registry),
 ):
     target = safe_next(next_url)
     username = username.strip()
     if not username:
         return RedirectResponse(f"/login?next={quote(target, safe='/')}", status_code=303)
+    client_id = get_or_create_client_id(request)
+    if presence.is_name_taken(username, client_id):
+        return RedirectResponse(
+            f"/login?next={quote(target, safe='/')}&error=name_taken", status_code=303
+        )
+    presence.touch(client_id, username)
     response = RedirectResponse(target, status_code=303)
     set_username_cookie(response, username)
+    set_client_id_cookie(response, client_id)
     return response
 
 
@@ -103,10 +122,14 @@ async def session_view(
     session_id: str,
     service: SessionService = Depends(get_session_service),
     manager: ConnectionManager = Depends(get_connection_manager),
+    presence: PresenceRegistry = Depends(get_presence_registry),
 ):
     username, redirect = require_username(request, f"/sessions/{session_id}")
     if redirect:
         return redirect
+
+    had_client_cookie = bool(get_client_id(request))
+    client_id = get_or_create_client_id(request)
 
     try:
         session = service.get_session(session_id)
@@ -115,9 +138,10 @@ async def session_view(
 
     if not session.is_closed:
         was_missing = username not in session.participants
-        session = service.join_session(session_id, username)
+        session = service.join_session(session_id, username, client_id)
         if was_missing:
             await manager.broadcast_state(session_id, "participant_joined", session)
+    presence.touch(client_id, username)
 
     session_url = _build_public_session_url(request, session_id)
     qr_b64 = qr_code_base64(session_url)
@@ -126,7 +150,7 @@ async def session_view(
     if username in session.participants and session.participants[username].estimate:
         my_estimate = session.participants[username].estimate.value
 
-    return templates.TemplateResponse(request, "session.html", {
+    response = templates.TemplateResponse(request, "session.html", {
         "session": session,
         "session_url": session_url,
         "qr_b64": qr_b64,
@@ -136,6 +160,9 @@ async def session_view(
         "my_estimate": my_estimate,
         "is_pm": username == session.creator,
     })
+    if not had_client_cookie:
+        set_client_id_cookie(response, client_id)
+    return response
 
 
 @router.post("/sessions/{session_id}/close")
@@ -178,23 +205,40 @@ async def submit_vote(
     estimate: str = Form(...),
     service: SessionService = Depends(get_session_service),
     manager: ConnectionManager = Depends(get_connection_manager),
+    presence: PresenceRegistry = Depends(get_presence_registry),
 ):
     response = RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
     username = get_username(request)
     if not username:
         return response
+    client_id = get_client_id(request)
+    presence.touch(client_id, username)
     try:
-        session = service.submit_vote(session_id, username, estimate)
+        session = service.submit_vote(session_id, username, estimate, client_id or None)
         await manager.broadcast_state(session_id, "vote_cast", session)
     except (SessionNotFoundError, SessionClosedError, ValueError):
         pass
     return response
 
 
+@router.post("/heartbeat")
+async def heartbeat(
+    request: Request,
+    presence: PresenceRegistry = Depends(get_presence_registry),
+):
+    presence.touch(get_client_id(request), get_username(request))
+    return Response(status_code=204)
+
+
 @router.post("/logout")
-async def logout_global(request: Request):
+async def logout_global(
+    request: Request,
+    presence: PresenceRegistry = Depends(get_presence_registry),
+):
+    presence.release(get_client_id(request))
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("username")
+    response.delete_cookie("client_id")
     return response
 
 
@@ -204,7 +248,9 @@ async def logout(
     session_id: str,
     service: SessionService = Depends(get_session_service),
     manager: ConnectionManager = Depends(get_connection_manager),
+    presence: PresenceRegistry = Depends(get_presence_registry),
 ):
+    presence.release(get_client_id(request))
     response = RedirectResponse(url="/login", status_code=303)
     username = get_username(request)
     if username:
@@ -214,6 +260,7 @@ async def logout(
         except SessionNotFoundError:
             pass
     response.delete_cookie("username")
+    response.delete_cookie("client_id")
     return response
 
 
