@@ -121,9 +121,6 @@
         {% endfor %}
       </div>
     </form>
-    {% if my_estimate %}
-    <p class="voted-confirm">✅ Twój aktualny głos: <strong>{{ my_estimate }}</strong>. Możesz go zmienić.</p>
-    {% endif %}
     {% else %}
     <p class="info-banner">🔒 Głosowanie zakończone.</p>
     {% if my_estimate %}
