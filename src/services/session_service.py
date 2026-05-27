@@ -18,12 +18,18 @@ class SessionLimitExceededError(Exception):
     pass
 
 
+class PermissionDeniedError(Exception):
+    pass
+
+
 class SessionService:
 
     def __init__(self, repository: SessionRepository) -> None:
         self._repo = repository
 
-    SESSION_LIMIT = settings.SESSION_LIMIT
+    @property
+    def SESSION_LIMIT(self) -> int:
+        return settings.SESSION_LIMIT
 
     def create_session(self, title: Optional[str] = None, creator: str = "") -> Session:
         if len(self._repo.list_all()) >= self.SESSION_LIMIT:
@@ -38,14 +44,22 @@ class SessionService:
             raise SessionNotFoundError(f"Session {session_id} not found")
         return session
 
-    def reset_session(self, session_id: str, new_title: Optional[str] = None) -> Session:
+    def _require_manager(self, session: Session, requester: Optional[str]) -> None:
+        if requester is not None and not session.is_managed_by(requester):
+            raise PermissionDeniedError("Only the session creator may manage it")
+
+    def reset_session(
+        self, session_id: str, new_title: Optional[str] = None, requester: Optional[str] = None
+    ) -> Session:
         session = self.get_session(session_id)
+        self._require_manager(session, requester)
         session.reset(new_title or generate_session_name())
         self._repo.save(session)
         return session
 
-    def close_session(self, session_id: str) -> Session:
+    def close_session(self, session_id: str, requester: Optional[str] = None) -> Session:
         session = self.get_session(session_id)
+        self._require_manager(session, requester)
         session.close()
         self._repo.save(session)
         return session
@@ -77,6 +91,6 @@ class SessionService:
     def purge_expired_sessions(self) -> None:
         self._repo.purge_expired(max_age_hours=settings.SESSION_MAX_AGE_HOURS)
 
-    def list_sessions(self) -> list:
+    def list_sessions(self) -> list[Session]:
         return self._repo.list_all()
 

@@ -55,7 +55,7 @@ class Session:
     title: str = ""
     creator: str = ""
     is_closed: bool = False
-    participants: dict = field(default_factory=dict)
+    participants: dict[str, Participant] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utcnow)
     last_used_at: datetime = field(default_factory=_utcnow)
 

@@ -26,16 +26,20 @@ def session_state(session) -> dict:
         {
             "username": p.username,
             "has_voted": p.has_voted,
+            "is_creator": p.username == session.creator,
             "estimate": p.estimate.value if (session.is_closed and p.estimate) else None,
         }
         for p in session.participants.values()
     ]
+    votes_count = sum(1 for p in participants if p["has_voted"])
+    total_count = len(participants)
     return {
         "session_id": session.id,
         "title": session.title,
         "is_closed": session.is_closed,
         "participants": participants,
-        "votes_count": sum(1 for p in session.participants.values() if p.has_voted),
-        "total_count": len(session.participants),
+        "votes_count": votes_count,
+        "total_count": total_count,
+        "progress_pct": round(votes_count * 100 / total_count) if total_count else 0,
         "vote_summary": vote_summary,
     }

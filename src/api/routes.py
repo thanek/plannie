@@ -7,13 +7,19 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.api.auth import get_username, require_username, safe_next, set_username_cookie
-from src.api.connections import manager
-from src.api.dependencies import get_session_service
+from src.api.connections import ConnectionManager
+from src.api.dependencies import get_connection_manager, get_session_service
 from src.api.presenters import session_state
 from src.config import settings
 from src.domain.models import VALID_ESTIMATES
 from src.services.qr import qr_code_base64
-from src.services.session_service import SessionService, SessionNotFoundError, SessionClosedError, SessionLimitExceededError
+from src.services.session_service import (
+    SessionService,
+    SessionNotFoundError,
+    SessionClosedError,
+    SessionLimitExceededError,
+    PermissionDeniedError,
+)
 
 templates = Jinja2Templates(directory="web/templates")
 
@@ -21,19 +27,15 @@ router = APIRouter()
 
 
 def _build_public_session_url(request: Request, session_id: str) -> str:
-    public_host = settings.public_host
-    if public_host.startswith("http://") or public_host.startswith("https://"):
-        base = public_host.rstrip("/")
-    else:
-        public_scheme = settings.public_scheme or request.url.scheme
-        public_port = settings.public_port
-        host = public_host
-        if public_port and ":" not in public_host:
-            host = f"{public_host}:{public_port}"
-        elif public_host == "localhost" and request.url.port:
-            host = f"{public_host}:{request.url.port}"
-        base = f"{public_scheme}://{host}"
-    return f"{base}/sessions/{session_id}"
+    host = settings.public_host
+    if host.startswith(("http://", "https://")):
+        return f"{host.rstrip('/')}/sessions/{session_id}"
+    scheme = settings.public_scheme or request.url.scheme
+    port = settings.public_port or (
+        str(request.url.port) if host == "localhost" and request.url.port else ""
+    )
+    netloc = f"{host}:{port}" if port and ":" not in host else host
+    return f"{scheme}://{netloc}/sessions/{session_id}"
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -100,6 +102,7 @@ async def session_view(
     request: Request,
     session_id: str,
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
     username, redirect = require_username(request, f"/sessions/{session_id}")
     if redirect:
@@ -140,15 +143,12 @@ async def close_session(
     request: Request,
     session_id: str,
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
-    username = get_username(request)
     try:
-        session = service.get_session(session_id)
-        if not session.is_managed_by(username):
-            return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
-        session = service.close_session(session_id)
+        session = service.close_session(session_id, requester=get_username(request))
         await manager.broadcast_state(session_id, "session_closed", session)
-    except SessionNotFoundError:
+    except (SessionNotFoundError, PermissionDeniedError):
         pass
     return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
 
@@ -159,15 +159,14 @@ async def reset_session(
     session_id: str,
     title: str = Form(""),
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
-    username = get_username(request)
     try:
-        session = service.get_session(session_id)
-        if not session.is_managed_by(username):
-            return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
-        session = service.reset_session(session_id, title.strip() or None)
+        session = service.reset_session(
+            session_id, title.strip() or None, requester=get_username(request)
+        )
         await manager.broadcast_state(session_id, "session_reset", session)
-    except SessionNotFoundError:
+    except (SessionNotFoundError, PermissionDeniedError):
         pass
     return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
 
@@ -176,15 +175,14 @@ async def reset_session(
 async def submit_vote(
     request: Request,
     session_id: str,
-    username: str = Form(...),
     estimate: str = Form(...),
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
     response = RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
-    username = username.strip()
+    username = get_username(request)
     if not username:
         return response
-    set_username_cookie(response, username)
     try:
         session = service.submit_vote(session_id, username, estimate)
         await manager.broadcast_state(session_id, "vote_cast", session)
@@ -205,6 +203,7 @@ async def logout(
     request: Request,
     session_id: str,
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
     response = RedirectResponse(url="/login", status_code=303)
     username = get_username(request)
@@ -222,6 +221,7 @@ async def logout(
 
 @router.websocket("/ws/sessions/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    manager = get_connection_manager()
     await manager.connect(session_id, websocket)
     try:
         while True:

@@ -1,0 +1,8 @@
+{% macro header_user(label, logout_action) %}
+<div class="header-user">
+  <span class="header-user-label">{{ label }}</span><strong class="header-username">{{ username }}</strong>
+  <form method="post" action="{{ logout_action }}" class="inline-form">
+    <button type="submit" class="link-btn">wyloguj</button>
+  </form>
+</div>
+{% endmacro %}

@@ -32,6 +32,3 @@ class ConnectionManager:
 
     async def broadcast_state(self, session_id: str, event: str, session) -> None:
         await self.broadcast(session_id, {"event": event, **session_state(session)})
-
-
-manager = ConnectionManager()

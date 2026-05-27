@@ -230,33 +230,32 @@ async def test_nonexistent_session_redirects_to_home(authed_client):
 # ── Voting ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_vote_sets_cookie(authed_client):
+async def test_vote_uses_cookie_identity(authed_client):
     r1 = await authed_client.post("/sessions", data={"title": "T"}, follow_redirects=False)
     session_id = r1.headers["location"].split("/sessions/")[1].rstrip("/")
 
     r2 = await authed_client.post(
         f"/sessions/{session_id}/vote",
-        data={"username": "TestPM", "estimate": "5"},
+        data={"estimate": "5"},
         follow_redirects=False,
     )
     assert r2.status_code == 303
-    assert "username" in r2.cookies
+    service = get_session_service()
+    assert service.get_session(session_id).participants["TestPM"].estimate == Estimate.FIVE
 
 
 @pytest.mark.asyncio
-async def test_vote_cookie_supports_diacritics(client):
-    client.cookies.set("username", "PM")
+async def test_diacritic_username_round_trips(client):
+    # login encodes the cookie; voting decodes it back to the original identity
+    r = await client.post("/login", data={"username": "Łukasz", "next_url": "/"}, follow_redirects=False)
+    assert "%C5%81ukasz" in r.headers.get("set-cookie", "")
+
     r1 = await client.post("/sessions", data={"title": "T"}, follow_redirects=False)
     session_id = r1.headers["location"].split("/sessions/")[1].rstrip("/")
+    await client.post(f"/sessions/{session_id}/vote", data={"estimate": "5"}, follow_redirects=False)
 
-    r2 = await client.post(
-        f"/sessions/{session_id}/vote",
-        data={"username": "Łukasz", "estimate": "5"},
-        follow_redirects=False,
-    )
-    assert r2.status_code == 303
-    set_cookie = r2.headers.get("set-cookie", "")
-    assert "%C5%81ukasz" in set_cookie
+    service = get_session_service()
+    assert "Łukasz" in service.get_session(session_id).participants
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────

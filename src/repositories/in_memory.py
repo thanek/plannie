@@ -25,6 +25,6 @@ class InMemorySessionRepository(SessionRepository):
         for sid in expired:
             del self._store[sid]
 
-    def list_all(self) -> list:
+    def list_all(self) -> list[Session]:
         return sorted(self._store.values(), key=lambda s: s.created_at, reverse=True)
 

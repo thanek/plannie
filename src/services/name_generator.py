@@ -1,24 +1,23 @@
 import random
 
-FEMALE_ADJECTIVES = [
-    "Zaangażowana", "Skupiona", "Wesoła", "Przemyślana", "Energiczna",
-    "Spokojna", "Kreatywna", "Zdeterminowana", "Ciekawa", "Ambitna",
-    "Odważna", "Precyzyjna", "Dynamiczna", "Uważna", "Zmotywowana",
-    "Pomysłowa", "Dokładna", "Opanowana", "Empatyczna", "Niezawodna",
-    "Konsekwentna", "Bystra", "Wytrwała", "Pracowita", "Pogodna",
-    "Rzetelna", "Spontaniczna", "Życzliwa", "Błyskotliwa", "Rozważna",
-    "Elastyczna", "Skrupulatna", "Zaradna", "Serdeczna", "Natchniona",
+# (forma żeńska, forma męska) — jedno źródło prawdy dla obu rodzajów.
+ADJECTIVE_PAIRS = [
+    ("Zaangażowana", "Zaangażowany"), ("Skupiona", "Skupiony"), ("Wesoła", "Wesoły"),
+    ("Przemyślana", "Przemyślany"), ("Energiczna", "Energiczny"), ("Spokojna", "Spokojny"),
+    ("Kreatywna", "Kreatywny"), ("Zdeterminowana", "Zdeterminowany"), ("Ciekawa", "Ciekawy"),
+    ("Ambitna", "Ambitny"), ("Odważna", "Odważny"), ("Precyzyjna", "Precyzyjny"),
+    ("Dynamiczna", "Dynamiczny"), ("Uważna", "Uważny"), ("Zmotywowana", "Zmotywowany"),
+    ("Pomysłowa", "Pomysłowy"), ("Dokładna", "Dokładny"), ("Opanowana", "Opanowany"),
+    ("Empatyczna", "Empatyczny"), ("Niezawodna", "Niezawodny"), ("Konsekwentna", "Konsekwentny"),
+    ("Bystra", "Bystry"), ("Wytrwała", "Wytrwały"), ("Pracowita", "Pracowity"),
+    ("Pogodna", "Pogodny"), ("Rzetelna", "Rzetelny"), ("Spontaniczna", "Spontaniczny"),
+    ("Życzliwa", "Życzliwy"), ("Błyskotliwa", "Błyskotliwy"), ("Rozważna", "Rozważny"),
+    ("Elastyczna", "Elastyczny"), ("Skrupulatna", "Skrupulatny"), ("Zaradna", "Zaradny"),
+    ("Serdeczna", "Serdeczny"), ("Natchniona", "Natchniony"),
 ]
 
-MALE_ADJECTIVES = [
-    "Zaangażowany", "Skupiony", "Wesoły", "Przemyślany", "Energiczny",
-    "Spokojny", "Kreatywny", "Zdeterminowany", "Ciekawy", "Ambitny",
-    "Odważny", "Precyzyjny", "Dynamiczny", "Uważny", "Zmotywowany",
-    "Pomysłowy", "Dokładny", "Opanowany", "Empatyczny", "Niezawodny",
-    "Konsekwentny", "Bystry", "Wytrwały", "Pracowity", "Pogodny",
-    "Rzetelny", "Spontaniczny", "Życzliwy", "Błyskotliwy", "Rozważny",
-    "Elastyczny", "Skrupulatny", "Zaradny", "Serdeczny", "Natchniony",
-]
+FEMALE_ADJECTIVES = [pair[0] for pair in ADJECTIVE_PAIRS]
+MALE_ADJECTIVES = [pair[1] for pair in ADJECTIVE_PAIRS]
 
 FEMALE_NAMES = [
     "Izabela", "Zofia", "Karolina", "Agnieszka", "Monika",
@@ -40,11 +39,9 @@ MALE_NAMES = [
 
 
 def generate_session_name() -> str:
-    # Keep adjective and first name in the same grammatical gender.
-    gender_pool = random.choice([
-        (FEMALE_ADJECTIVES, FEMALE_NAMES),
-        (MALE_ADJECTIVES, MALE_NAMES),
-    ])
-    adjectives, names = gender_pool
-    return f"{random.choice(adjectives)} {random.choice(names)}"
+    # 0 = żeński, 1 = męski — losujemy raz, by przymiotnik i imię miały zgodny rodzaj.
+    gender = random.randint(0, 1)
+    adjective = random.choice(ADJECTIVE_PAIRS)[gender]
+    name = random.choice(FEMALE_NAMES if gender == 0 else MALE_NAMES)
+    return f"{adjective} {name}"
 

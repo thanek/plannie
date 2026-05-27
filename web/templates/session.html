@@ -1,14 +1,8 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros with context %}
 {% block title %}{{ session.title }} – Planning Estimator{% endblock %}
 
-{% block header_user %}
-<div class="header-user">
-  <span class="header-user-label">Głosujesz jako </span><strong class="header-username">{{ username }}</strong>
-  <form method="post" action="/sessions/{{ session.id }}/logout" class="inline-form">
-    <button type="submit" class="link-btn">wyloguj</button>
-  </form>
-</div>
-{% endblock %}
+{% block header_user %}{{ macros.header_user("Głosujesz jako ", "/sessions/" + session.id + "/logout") }}{% endblock %}
 
 {% block content %}
 <div class="session-layout">
@@ -53,10 +47,9 @@
       <p class="votes-progress-label">
         Oddane głosy: <strong><span id="votes-count">{{ state.votes_count }}</span>/<span id="total-count">{{ state.total_count }}</span></strong>
       </p>
-      {% set progress = (state.votes_count * 100 / state.total_count) if state.total_count > 0 else 0 %}
       <div class="votes-progress" role="progressbar" aria-label="Postęp głosowania"
-           aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ progress|round|int }}">
-        <div id="votes-progress-fill" class="votes-progress-fill" style="width: {{ progress }}%"></div>
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ state.progress_pct }}">
+        <div id="votes-progress-fill" class="votes-progress-fill" style="width: {{ state.progress_pct }}%"></div>
       </div>
     </div>
 
@@ -72,7 +65,7 @@
       <li class="participant {% if p.has_voted %}voted{% endif %}" data-user="{{ p.username }}">
         <span class="username">
           {{ p.username }}
-          {% if p.username == session.creator %}<span class="pm-tag">PM</span>{% endif %}
+          {% if p.is_creator %}<span class="pm-tag">PM</span>{% endif %}
         </span>
         <span class="vote-badge">
           {% if session.is_closed and p.estimate %}
@@ -110,7 +103,6 @@
   <section class="card">
     {% if not session.is_closed %}
     <form method="post" action="/sessions/{{ session.id }}/vote" id="vote-form">
-      <input type="hidden" name="username" value="{{ username }}"/>
       <div class="estimate-grid">
         {% for e in estimates %}
         <label class="estimate-card {% if my_estimate == e.value %}selected{% endif %}">
@@ -149,13 +141,12 @@
   ws.onclose = () => setTimeout(() => location.reload(), 3000);
 
   function updateParticipants(data) {
-    const progress = data.total_count > 0 ? Math.round((data.votes_count * 100) / data.total_count) : 0;
     document.getElementById("session-title").textContent = data.title;
     document.getElementById("votes-count").textContent = data.votes_count;
     document.getElementById("total-count").textContent = data.total_count;
     document.getElementById("votes-count-inline").textContent = data.votes_count;
     document.getElementById("total-count-inline").textContent = data.total_count;
-    document.getElementById("votes-progress-fill").style.width = `${progress}%`;
+    document.getElementById("votes-progress-fill").style.width = `${data.progress_pct}%`;
 
     const list = document.getElementById("participants-list");
     list.innerHTML = data.participants.map(p => {
@@ -167,9 +158,10 @@
       } else {
         badge = `<span class="waiting">⏳</span>`;
       }
+      const pmTag = p.is_creator ? ` <span class="pm-tag">PM</span>` : "";
       return `
         <li class="participant ${p.has_voted ? 'voted' : ''}" data-user="${p.username}">
-          <span class="username">${p.username}</span>
+          <span class="username">${p.username}${pmTag}</span>
           <span class="vote-badge">${badge}</span>
         </li>`;
     }).join('');
