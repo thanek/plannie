@@ -1,4 +1,4 @@
-# Planning Estimator
+# Plannie
 
 Serwis do estymowania zadań w stylu Planning Poker (Scrum), z real-time aktualizacjami przez WebSocket.
 

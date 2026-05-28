@@ -31,7 +31,7 @@ async def _periodic_purge():
         service.purge_expired_sessions()
 
 
-app = FastAPI(title="Planning Estimator", lifespan=lifespan)
+app = FastAPI(title="Plannie", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 app.include_router(router)
 

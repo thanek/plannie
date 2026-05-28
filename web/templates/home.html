@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros with context %}
-{% block title %}Planning Estimator{% endblock %}
+{% block title %}Plannie{% endblock %}
 
 {% block header_user %}{{ macros.header_user("Cześć, ", "/logout") }}{% endblock %}
 
@@ -8,7 +8,7 @@
 <div class="home-layout">
   <div class="card home-create-card">
     <div class="hero-icon">🃏</div>
-    <h1>Planning Estimator</h1>
+    <h1>Plannie</h1>
     <p class="subtitle">Utwórz sesję, udostępnij QR kod zespołowi i zacznij estymować.</p>
     {% if limit_exceeded %}
     <p class="info-banner">⚠️ Osiągnięto limit {{ session_limit }} sesji. Poczekaj aż starsze wygasną (po 24h).</p>
