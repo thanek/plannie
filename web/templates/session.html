@@ -53,6 +53,24 @@
       </div>
     </div>
 
+    {% if session.is_closed %}
+    <div id="vote-summary" class="vote-summary">
+      <h4>Podsumowanie głosowania</h4>
+      <div class="vote-summary-layout">
+        <ul id="vote-summary-list" class="vote-summary-list">
+          {% for item in state.vote_summary %}
+          <li class="vote-summary-item" data-estimate="{{ item.estimate }}" data-count="{{ item.count }}" data-voters="{{ item.voters | join(',') }}">
+            <span class="legend-dot" aria-hidden="true"></span>
+            <span class="summary-estimate">{{ item.estimate }}</span>
+            <span class="summary-count">{{ item.count }} os.</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <svg id="vote-pie-chart" class="vote-pie" viewBox="0 0 192 210" role="img" aria-label="Wykres rozkładu głosów"></svg>
+      </div>
+    </div>
+    {% endif %}
+
     <h3>
       Uczestnicy
       <span class="counter">
@@ -82,20 +100,6 @@
 
     {% if state.total_count == 0 %}
     <p class="empty-hint">Udostępnij link lub QR kod uczestnikom.</p>
-    {% endif %}
-
-    {% if session.is_closed %}
-    <div id="vote-summary" class="vote-summary">
-      <h4>Podsumowanie głosowania</h4>
-      <ul id="vote-summary-list" class="vote-summary-list">
-        {% for item in state.vote_summary %}
-        <li class="vote-summary-item">
-          <span class="summary-estimate">{{ item.estimate }}</span>
-          <span class="summary-count">{{ item.count }} os.</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
     {% endif %}
   </section>
 
@@ -169,6 +173,185 @@
 
   const voteForm = document.getElementById("vote-form");
   let submitting = false;
+
+  // ── Popover ──
+  const popover = document.createElement("div");
+  popover.className = "pie-popover";
+  document.body.appendChild(popover);
+
+  function showPopover(anchor, voters, estimate) {
+    if (!voters.length) return;
+    popover.innerHTML = `<strong>${estimate}</strong><ul>${voters.map(v => `<li>${v}</li>`).join("")}</ul>`;
+    popover.classList.add("visible");
+    positionPopover(anchor);
+  }
+
+  function hidePopover() {
+    popover.classList.remove("visible");
+  }
+
+  function positionPopover(anchor) {
+    const rect = anchor.getBoundingClientRect();
+    const pw = popover.offsetWidth;
+    const ph = popover.offsetHeight;
+    let top = rect.top + window.scrollY - ph - 8;
+    let left = rect.left + window.scrollX + rect.width / 2 - pw / 2;
+    if (top < window.scrollY + 8) top = rect.bottom + window.scrollY + 8;
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+  }
+
+  const PIE_COLORS = [
+    "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+    "#14b8a6", "#ec4899", "#f97316", "#06b6d4", "#84cc16"
+  ];
+
+  function lighten(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.min(255, ((n >> 16) & 0xff) + 60);
+    const g = Math.min(255, ((n >> 8) & 0xff) + 60);
+    const b = Math.min(255, (n & 0xff) + 60);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function renderPieChart() {
+    const svg = document.getElementById("vote-pie-chart");
+    const list = document.getElementById("vote-summary-list");
+    if (!svg || !list) return;
+
+    const items = Array.from(list.querySelectorAll(".vote-summary-item"));
+    const counts = items.map(li => parseInt(li.dataset.count, 10) || 0);
+    const total = counts.reduce((a, b) => a + b, 0);
+    svg.innerHTML = "";
+    if (total === 0) return;
+
+    const cx = 96, cy = 92, r = 78;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // defs: shadow filter + per-color radial gradients
+    const defs = document.createElementNS(SVG_NS, "defs");
+
+    const filter = document.createElementNS(SVG_NS, "filter");
+    filter.setAttribute("id", "pie-shadow");
+    filter.setAttribute("x", "-20%"); filter.setAttribute("y", "-20%");
+    filter.setAttribute("width", "140%"); filter.setAttribute("height", "140%");
+    const feDropShadow = document.createElementNS(SVG_NS, "feDropShadow");
+    feDropShadow.setAttribute("dx", "0"); feDropShadow.setAttribute("dy", "6");
+    feDropShadow.setAttribute("stdDeviation", "8");
+    feDropShadow.setAttribute("flood-color", "rgba(0,0,0,0.35)");
+    filter.appendChild(feDropShadow);
+    defs.appendChild(filter);
+
+    counts.forEach((_, i) => {
+      const color = PIE_COLORS[i % PIE_COLORS.length];
+      const grad = document.createElementNS(SVG_NS, "radialGradient");
+      grad.setAttribute("id", `pie-grad-${i}`);
+      grad.setAttribute("cx", "35%"); grad.setAttribute("cy", "30%");
+      grad.setAttribute("r", "65%");
+      const s1 = document.createElementNS(SVG_NS, "stop");
+      s1.setAttribute("offset", "0%"); s1.setAttribute("stop-color", lighten(color));
+      const s2 = document.createElementNS(SVG_NS, "stop");
+      s2.setAttribute("offset", "100%"); s2.setAttribute("stop-color", color);
+      grad.appendChild(s1); grad.appendChild(s2);
+      defs.appendChild(grad);
+    });
+    svg.appendChild(defs);
+
+    // 3D shadow ellipse underneath
+    const shadow = document.createElementNS(SVG_NS, "ellipse");
+    shadow.setAttribute("cx", cx + 2); shadow.setAttribute("cy", cy + r + 6);
+    shadow.setAttribute("rx", r * 0.85); shadow.setAttribute("ry", r * 0.14);
+    shadow.setAttribute("fill", "rgba(0,0,0,0.22)");
+    shadow.setAttribute("filter", "url(#pie-shadow)");
+    svg.appendChild(shadow);
+
+    // group with drop-shadow filter
+    const g = document.createElementNS(SVG_NS, "g");
+    g.setAttribute("filter", "url(#pie-shadow)");
+
+    const slicesData = [];
+
+    if (counts.filter(c => c > 0).length === 1) {
+      const idx = counts.findIndex(c => c > 0);
+      const color = PIE_COLORS[idx % PIE_COLORS.length];
+      items[idx].querySelector(".legend-dot").style.background = color;
+      const circle = document.createElementNS(SVG_NS, "circle");
+      circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", r);
+      circle.setAttribute("fill", `url(#pie-grad-${idx})`);
+      circle.style.cursor = "pointer";
+      g.appendChild(circle);
+      svg.appendChild(g);
+      addReflection(svg, SVG_NS, cx, cy, r);
+      return;
+    }
+
+    let angle = -Math.PI / 2;
+    counts.forEach((count, i) => {
+      const color = PIE_COLORS[i % PIE_COLORS.length];
+      items[i].querySelector(".legend-dot").style.background = color;
+      if (count === 0) return;
+      const slice = (count / total) * Math.PI * 2;
+      const midAngle = angle + slice / 2;
+      const x1 = cx + r * Math.cos(angle);
+      const y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(angle + slice);
+      const y2 = cy + r * Math.sin(angle + slice);
+      const large = slice > Math.PI ? 1 : 0;
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`);
+      path.setAttribute("fill", `url(#pie-grad-${i})`);
+      path.setAttribute("stroke", "rgba(255,255,255,0.15)");
+      path.setAttribute("stroke-width", "2.5");
+      path.style.cursor = "pointer";
+      path.style.transition = "transform 0.18s ease";
+
+      const dx = Math.cos(midAngle) * 10;
+      const dy = Math.sin(midAngle) * 10;
+      const listItem = items[i];
+      const voters = (listItem.dataset.voters || "").split(",").filter(Boolean);
+      const estimate = listItem.dataset.estimate;
+
+      function activate(anchorEl) {
+        path.style.transform = `translate(${dx}px, ${dy}px)`;
+        listItem.classList.add("pie-highlighted");
+        showPopover(anchorEl, voters, estimate);
+      }
+      function deactivate() {
+        path.style.transform = "";
+        listItem.classList.remove("pie-highlighted");
+        hidePopover();
+      }
+
+      path.addEventListener("mouseenter", () => activate(path));
+      path.addEventListener("mouseleave", deactivate);
+      listItem.addEventListener("mouseenter", () => activate(listItem));
+      listItem.addEventListener("mouseleave", deactivate);
+
+      const title = document.createElementNS(SVG_NS, "title");
+      title.textContent = `${items[i].dataset.estimate}: ${count} (${Math.round(count / total * 100)}%)`;
+      path.appendChild(title);
+      g.appendChild(path);
+      slicesData.push({ path, midAngle });
+      angle += slice;
+    });
+
+    svg.appendChild(g);
+    addReflection(svg, SVG_NS, cx, cy, r);
+  }
+
+  function addReflection(svg, SVG_NS, cx, cy, r) {
+    const shine = document.createElementNS(SVG_NS, "ellipse");
+    shine.setAttribute("cx", cx - r * 0.2);
+    shine.setAttribute("cy", cy - r * 0.3);
+    shine.setAttribute("rx", r * 0.38);
+    shine.setAttribute("ry", r * 0.18);
+    shine.setAttribute("fill", "rgba(255,255,255,0.13)");
+    shine.setAttribute("transform", `rotate(-30, ${cx}, ${cy})`);
+    svg.appendChild(shine);
+  }
+
+  renderPieChart();
 
   document.querySelectorAll(".estimate-card input[type=radio]").forEach(radio => {
     radio.addEventListener("change", () => {

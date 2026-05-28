@@ -7,15 +7,17 @@ _ORDER_INDEX = {estimate.value: idx for idx, estimate in enumerate(VALID_ESTIMAT
 
 def session_state(session) -> dict:
     summary_count: Dict[str, int] = {}
+    summary_voters: Dict[str, list] = {}
     if session.is_closed:
         for participant in session.participants.values():
             if participant.estimate is None:
                 continue
             value = participant.estimate.value
             summary_count[value] = summary_count.get(value, 0) + 1
+            summary_voters.setdefault(value, []).append(participant.username)
 
     vote_summary = [
-        {"estimate": estimate, "count": count}
+        {"estimate": estimate, "count": count, "voters": summary_voters.get(estimate, [])}
         for estimate, count in sorted(
             summary_count.items(),
             key=lambda item: (-item[1], _ORDER_INDEX.get(item[0], 999)),

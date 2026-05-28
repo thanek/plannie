@@ -11,6 +11,7 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self._connections: Dict[str, List[WebSocket]] = defaultdict(list)
+        self._home_connections: List[WebSocket] = []
 
     async def connect(self, session_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -32,3 +33,21 @@ class ConnectionManager:
 
     async def broadcast_state(self, session_id: str, event: str, session) -> None:
         await self.broadcast(session_id, {"event": event, **session_state(session)})
+
+    async def connect_home(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self._home_connections.append(websocket)
+
+    def disconnect_home(self, websocket: WebSocket) -> None:
+        if websocket in self._home_connections:
+            self._home_connections.remove(websocket)
+
+    async def broadcast_home(self, event: str) -> None:
+        dead = []
+        for ws in self._home_connections:
+            try:
+                await ws.send_text(json.dumps({"event": event}))
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self._home_connections.remove(ws)

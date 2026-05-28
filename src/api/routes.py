@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, Request, Response, WebSocket
@@ -31,6 +33,18 @@ from src.services.session_service import (
 )
 
 templates = Jinja2Templates(directory="web/templates")
+
+_STATIC_DIR = Path("web/static")
+
+
+def _static_version(filename: str) -> str:
+    try:
+        return str(int(os.path.getmtime(_STATIC_DIR / filename)))
+    except OSError:
+        return "0"
+
+
+templates.env.globals["static_version"] = _static_version
 
 router = APIRouter()
 
@@ -103,6 +117,7 @@ async def create_session(
     request: Request,
     title: str = Form(""),
     service: SessionService = Depends(get_session_service),
+    manager: ConnectionManager = Depends(get_connection_manager),
 ):
     username, redirect = require_username(request, "/")
     if redirect:
@@ -111,6 +126,7 @@ async def create_session(
         session = service.create_session(title.strip() or None, creator=username)
     except SessionLimitExceededError:
         return RedirectResponse(url="/?error=limit", status_code=303)
+    await manager.broadcast_home("sessions_updated")
     return RedirectResponse(url=f"/sessions/{session.id}", status_code=303)
 
 
@@ -141,6 +157,7 @@ async def session_view(
         session = service.join_session(session_id, username, client_id)
         if was_missing:
             await manager.broadcast_state(session_id, "participant_joined", session)
+            await manager.broadcast_home("sessions_updated")
     presence.touch(client_id, username)
 
     session_url = _build_public_session_url(request, session_id)
@@ -175,6 +192,7 @@ async def close_session(
     try:
         session = service.close_session(session_id, requester=get_username(request))
         await manager.broadcast_state(session_id, "session_closed", session)
+        await manager.broadcast_home("sessions_updated")
     except (SessionNotFoundError, PermissionDeniedError):
         pass
     return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
@@ -193,6 +211,7 @@ async def reset_session(
             session_id, title.strip() or None, requester=get_username(request)
         )
         await manager.broadcast_state(session_id, "session_reset", session)
+        await manager.broadcast_home("sessions_updated")
     except (SessionNotFoundError, PermissionDeniedError):
         pass
     return RedirectResponse(url=f"/sessions/{session_id}", status_code=303)
@@ -257,6 +276,7 @@ async def logout(
         try:
             session = service.leave_session(session_id, username)
             await manager.broadcast_state(session_id, "participant_left", session)
+            await manager.broadcast_home("sessions_updated")
         except SessionNotFoundError:
             pass
     response.delete_cookie("username")
@@ -265,6 +285,18 @@ async def logout(
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
+
+@router.websocket("/ws/home")
+async def websocket_home(websocket: WebSocket):
+    manager = get_connection_manager()
+    await manager.connect_home(websocket)
+    try:
+        while True:
+            await asyncio.sleep(30)
+            await websocket.send_text(json.dumps({"event": "ping"}))
+    except Exception:
+        manager.disconnect_home(websocket)
+
 
 @router.websocket("/ws/sessions/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
