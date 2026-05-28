@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$PROJECT_ROOT"
 
-# ── Kolory ────────────────────────────────────────────────────────────────────
+# ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -23,9 +23,9 @@ error()   { echo -e "${RED}[err]${RESET}  $*" >&2; }
 # ── Helpers ───────────────────────────────────────────────────────────────────
 ensure_venv() {
     if [[ ! -d "$VENV_DIR" ]]; then
-        warn "Virtualenv nie istnieje – tworzę '$VENV_DIR'..."
+        warn "Virtualenv not found – creating '$VENV_DIR'..."
         python3 -m venv "$VENV_DIR"
-        success "Virtualenv utworzony."
+        success "Virtualenv created."
     fi
 }
 
@@ -35,66 +35,65 @@ activate_venv() {
 }
 
 needs_install() {
-    # Minimalna walidacja kluczowych pakietów używanych przez aplikację.
     "$VENV_DIR/bin/python" -c "import fastapi, dotenv" 2>/dev/null && return 1 || return 0
 }
 
 do_install() {
     ensure_venv
     activate_venv
-    info "Instaluję zależności z $REQUIREMENTS..."
+    info "Installing dependencies from $REQUIREMENTS..."
     pip install --quiet --upgrade pip
     pip install --quiet -r "$REQUIREMENTS"
-    success "Zależności zainstalowane."
+    success "Dependencies installed."
 }
 
 ensure_deps() {
     ensure_venv
     if needs_install; then
-        warn "Zależności nie są zainstalowane – uruchamiam install..."
+        warn "Dependencies not installed – running install..."
         do_install
     else
         activate_venv
     fi
 }
 
-# ── Komendy ───────────────────────────────────────────────────────────────────
+# ── Commands ──────────────────────────────────────────────────────────────────
 cmd_install() {
     do_install
 }
 
 cmd_start() {
     ensure_deps
-    info "Uruchamiam Planning Estimator"
-    echo -e "${BOLD}  Zatrzymaj serwis: Ctrl+C${RESET}"
+    info "Starting Plannie"
+    echo -e "${BOLD}  Stop the service: Ctrl+C${RESET}"
     echo ""
     exec "$VENV_DIR/bin/python" -m src.main
 }
 
 cmd_test() {
     ensure_deps
-    info "Uruchamiam testy..."
+    info "Running tests..."
     echo ""
     python -m pytest tests/ -v "$@"
 }
 
-# ── Pomoc ─────────────────────────────────────────────────────────────────────
+# ── Help ──────────────────────────────────────────────────────────────────────
 usage() {
     echo ""
-    echo -e "${BOLD}Planning Estimator – launcher${RESET}"
+    echo -e "${BOLD}Plannie – launcher${RESET}"
     echo ""
-    echo -e "  ${CYAN}./run.sh${RESET} ${BOLD}<komenda>${RESET}"
+    echo -e "  ${CYAN}./run.sh${RESET} ${BOLD}<command>${RESET}"
     echo ""
-    echo -e "  ${BOLD}Komendy:${RESET}"
-    echo -e "    ${GREEN}start${RESET}     Uruchom serwis (domyślnie http://0.0.0.0:8000)"
-    echo -e "    ${GREEN}test${RESET}      Uruchom testy (dodatkowe args trafiają do pytest)"
-    echo -e "    ${GREEN}install${RESET}   Utwórz venv i zainstaluj zależności"
+    echo -e "  ${BOLD}Commands:${RESET}"
+    echo -e "    ${GREEN}start${RESET}     Start the service (default http://0.0.0.0:8000)"
+    echo -e "    ${GREEN}test${RESET}      Run tests (extra args are forwarded to pytest)"
+    echo -e "    ${GREEN}install${RESET}   Create venv and install dependencies"
     echo ""
-    echo -e "  ${BOLD}Zmienne środowiskowe:${RESET}"
-    echo -e "    HOST   Adres nasłuchiwania (domyślnie: 0.0.0.0)"
-    echo -e "    PORT   Port nasłuchiwania  (domyślnie: 8000)"
+    echo -e "  ${BOLD}Environment variables:${RESET}"
+    echo -e "    HOST   Listening address (default: 0.0.0.0)"
+    echo -e "    PORT   Listening port    (default: 8000)"
     echo ""
-    echo -e "  ${BOLD}Przykłady:${RESET}"
+    echo -e "  ${BOLD}Examples:${RESET}"
     echo -e "    ${YELLOW}./run.sh start${RESET}"
     echo -e "    ${YELLOW}PORT=9000 ./run.sh start${RESET}"
     echo -e "    ${YELLOW}./run.sh test${RESET}"
@@ -105,7 +104,7 @@ usage() {
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 COMMAND="${1:-}"
-shift || true   # przesuń argumenty; reszta trafi do $@
+shift || true
 
 case "$COMMAND" in
     start)   cmd_start "$@" ;;
@@ -113,9 +112,8 @@ case "$COMMAND" in
     install) cmd_install ;;
     "")      usage ;;
     *)
-        error "Nieznana komenda: '$COMMAND'"
+        error "Unknown command: '$COMMAND'"
         usage
         exit 1
         ;;
 esac
-
